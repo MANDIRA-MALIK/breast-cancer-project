@@ -1,50 +1,31 @@
 import streamlit as st
 import requests
-import numpy as np
-import cv2
+from PIL import Image
 
 st.title("Breast Cancer Detection App")
 
 uploaded_file = st.file_uploader("Upload Image", type=["jpg", "png", "jpeg"])
 
 if uploaded_file is not None:
+    image = Image.open(uploaded_file)
+    st.image(image, caption="Uploaded Image", use_column_width=True)
 
-    st.image(uploaded_file, caption="Uploaded Image")
-
-    url = "https://breast-cancer-api-1-mx88.onrender.com/predict"
-
-    files = {
-        "file": ("image.jpg", uploaded_file.getvalue(), "image/jpeg")
-    }
-
-    response = requests.post(url, files=files)
-
-    # DEBUG
-    st.write("Status Code:", response.status_code)
-    st.write("Response Text:", response.text)
-
-    if response.status_code == 200:
+    if st.button("Predict"):
         try:
-            result = response.json()
+            response = requests.post(
+                "https://breast-cancer-api-1-mx88.onrender.com/predict",
+                files={"file": uploaded_file.getvalue()}
+            )
 
-            st.success("Prediction Done ✅")
+            if response.status_code == 200:
+                result = response.json()
 
-            if "prediction" in result:
-                if result["prediction"] > 0.5:
+                if result["prediction"] == "Malignant":
                     st.error("⚠️ Malignant")
                 else:
                     st.success("✅ Benign")
-
-            if "gradcam" in result:
-                gradcam_bytes = bytes.fromhex(result["gradcam"])
-                nparr = np.frombuffer(gradcam_bytes, np.uint8)
-                img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-                img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-
-                st.image(img, caption="GradCAM 🔥")
+            else:
+                st.error("API Error")
 
         except Exception as e:
-            st.error(f"JSON Error: {e}")
-
-    else:
-        st.error("API Failed ❌")
+            st.error(f"Error: {e}")
