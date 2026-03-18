@@ -1,27 +1,53 @@
 import streamlit as st
 import requests
+import numpy as np
+import cv2
 from PIL import Image
 import io
 
-st.title("Breast Cancer Detection + GradCAM")
+# Title
+st.title("Breast Cancer Detection App")
+st.write("Upload an image to get prediction + GradCAM 🔬")
 
-file = st.file_uploader("Upload Image", type=["jpg","png","jpeg"])
+# Upload image
+uploaded_file = st.file_uploader("Upload Image", type=["jpg", "png", "jpeg"])
 
-if file:
-    st.image(file)
+if uploaded_file is not None:
+    # Show uploaded image
+    image = Image.open(uploaded_file)
+    st.image(image, caption="Uploaded Image", use_column_width=True)
 
-    # API URL (yaha apna Render API link daalo)
-    url = "https://your-api-url.onrender.com/predict"
+    # Prepare file for API
+    files = {"file": uploaded_file.getvalue()}
 
-    files = {"file": file.getvalue()}
+    # Call API
+    response = requests.post(
+        "https://breast-cancer-api-1-mx88.onrender.com/predict",
+        files=files
+    )
 
-    res = requests.post(url, files=files)
+    # Debug (optional)
+    st.write("API Response:", response.text)
 
-    result = res.json()
+    # Handle response
+    if response.status_code == 200:
+        result = response.json()
 
-    st.write("Prediction:", result["prediction"])
+        # Show prediction
+        st.subheader("Prediction Result")
+        st.write(result["prediction"])
 
-    if "gradcam" in result:
-        image_bytes = bytes(result["gradcam"])
-        img = Image.open(io.BytesIO(image_bytes))
-        st.image(img, caption="GradCAM")
+        # 🔥 Decode GradCAM
+        gradcam_bytes = bytes.fromhex(result["gradcam"])
+        nparr = np.frombuffer(gradcam_bytes, np.uint8)
+        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+        # Convert BGR → RGB
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
+        # Show GradCAM image
+        st.subheader("GradCAM Output")
+        st.image(img, use_column_width=True)
+
+    else:
+        st.error("API Error ❌")
