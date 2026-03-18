@@ -2,38 +2,39 @@ import streamlit as st
 import requests
 import numpy as np
 import cv2
-from PIL import Image
-import time
 
 st.title("Breast Cancer Detection App")
 
 uploaded_file = st.file_uploader("Upload Image", type=["jpg", "png", "jpeg"])
 
 if uploaded_file is not None:
-    image = Image.open(uploaded_file)
-    st.image(image, caption="Uploaded Image")
 
-    files = {"file": uploaded_file.getvalue()}
+    st.image(uploaded_file, caption="Uploaded Image")
 
-    # small delay (Render wakeup)
-    time.sleep(2)
+    url = "https://breast-cancer-api-1-mx88.onrender.com/predict"
 
-    response = requests.post(
-        "https://breast-cancer-api-1-mx88.onrender.com/predict",
-        files=files
-    )
+    files = {
+        "file": ("image.jpg", uploaded_file.getvalue(), "image/jpeg")
+    }
 
-    # DEBUG
+    response = requests.post(url, files=files)
+
     st.write("Status Code:", response.status_code)
-    st.write("Raw Response:", response.text)
+    st.write("Response Text:", response.text)
 
     if response.status_code == 200:
         try:
             result = response.json()
 
+            st.success("Prediction Done ✅")
+
             # Prediction
-            st.subheader("Prediction")
-            st.write(result["prediction"])
+            prediction = result["prediction"]
+
+            if prediction > 0.5:
+                st.error("⚠️ Malignant (Cancer Detected)")
+            else:
+                st.success("✅ Benign (No Cancer)")
 
             # GradCAM
             gradcam_bytes = bytes.fromhex(result["gradcam"])
@@ -41,11 +42,10 @@ if uploaded_file is not None:
             img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
-            st.subheader("GradCAM Output")
-            st.image(img)
+            st.image(img, caption="GradCAM Heatmap 🔥")
 
         except Exception as e:
             st.error(f"JSON Error: {e}")
 
     else:
-        st.error("API failed ❌")
+        st.error("API Failed ❌")
